@@ -363,15 +363,28 @@
     <div class="project-card fade-in">
       <div class="project-gallery" id="projectGallery">
         <div class="gallery-main" id="galleryMain">
-          <div class="upload-placeholder" id="uploadPlaceholder" onclick="document.getElementById('imgInput').click()">
+          <div class="upload-placeholder" id="uploadPlaceholder" style="cursor:pointer;user-select:none;">
             <div class="upload-icon">🖼️</div>
-            <div class="upload-title">Click to add project screenshots</div>
-            <div class="upload-sub">PNG, JPG up to 10MB each · Multiple files supported</div>
+            <div class="upload-title" id="uploadTitle">Click to add project screenshots</div>
+            <div class="upload-sub" id="uploadSub">PNG, JPG up to 10MB each · Multiple files supported</div>
             <input type="file" id="imgInput" accept="image/*" multiple style="display:none" onchange="handleImages(event)">
           </div>
           <img id="mainImg" src="" alt="" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:0;">
         </div>
         <div class="gallery-thumbs" id="galleryThumbs" style="display:none"></div>
+      </div>
+
+      <!-- Admin Password Modal -->
+      <div id="adminModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;">
+        <div style="background:white;padding:2rem;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.2);width:90%;max-width:380px;">
+          <h3 style="margin-bottom:1rem;color:#1a1a2e;font-size:1.1rem;">Admin Mode</h3>
+          <p style="color:#4a4a6a;margin-bottom:1.5rem;font-size:0.9rem;">Enter password to manage project images</p>
+          <input type="password" id="adminPassword" placeholder="Enter password" style="width:100%;padding:10px 14px;border:1px solid rgba(91,79,207,0.3);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:0.9rem;margin-bottom:1rem;outline:none;" onkeypress="if(event.key==='Enter') verifyAdminPassword()">
+          <div style="display:flex;gap:0.8rem;">
+            <button onclick="closeAdminModal()" style="flex:1;padding:10px;border:1px solid #ddd;background:white;border-radius:8px;cursor:pointer;font-weight:500;color:#4a4a6a;">Cancel</button>
+            <button onclick="verifyAdminPassword()" style="flex:1;padding:10px;background:#5b4fcf;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:500;">Unlock</button>
+          </div>
+        </div>
       </div>
       <div class="project-body">
         <div class="project-platform">Unity 2D · C# · UnityWebRequest</div>
@@ -467,31 +480,53 @@
 </footer>
 
 <script>
-  // Scroll animations
-  const obs = new IntersectionObserver(entries => {
-    entries.forEach(e => {
-      if (!e.isIntersecting) return;
-      e.target.classList.add('visible');
-      e.target.querySelectorAll('[data-target]').forEach(el => {
-        const t = +el.dataset.target; let c = 0;
-        const iv = setInterval(() => {
-          c = Math.min(c + t/50, t);
-          el.textContent = Math.floor(c);
-          if (c >= t) { el.textContent = t; clearInterval(iv); }
-        }, 30);
-      });
-    });
-  }, { threshold: 0.12 });
-  document.querySelectorAll('.fade-in').forEach(el => obs.observe(el));
+  // === ADMIN PASSWORD PROTECTION ===
+  const ADMIN_PASSWORD = 'manh123'; // Change this to your password
+  let isAdminMode = false;
 
-  const st = document.getElementById('scrollTop');
-  window.addEventListener('scroll', () => st.classList.toggle('show', scrollY > 400));
+  function openAdminModal() {
+    document.getElementById('adminModal').style.display = 'flex';
+    document.getElementById('adminPassword').focus();
+  }
 
-  // Image gallery upload
+  function closeAdminModal() {
+    document.getElementById('adminModal').style.display = 'none';
+    document.getElementById('adminPassword').value = '';
+  }
+
+  function verifyAdminPassword() {
+    const password = document.getElementById('adminPassword').value;
+    if (password === ADMIN_PASSWORD) {
+      isAdminMode = true;
+      document.getElementById('uploadPlaceholder').style.cursor = 'pointer';
+      closeAdminModal();
+      document.getElementById('imgInput').click();
+    } else {
+      alert('❌ Incorrect password');
+      document.getElementById('adminPassword').value = '';
+    }
+  }
+
+  // === GALLERY / IMAGE UPLOAD ===
   let images = [];
   let activeIdx = 0;
 
+  // Placeholder click - show admin modal instead of direct upload
+  document.getElementById('uploadPlaceholder').addEventListener('click', function(e) {
+    if (images.length === 0) {
+      openAdminModal();
+    } else {
+      // If images exist, show modal for additional uploads
+      openAdminModal();
+    }
+  });
+
   function handleImages(e) {
+    if (!isAdminMode) {
+      alert('⛔ Admin access required');
+      return;
+    }
+
     const files = Array.from(e.target.files);
     files.forEach(file => {
       const reader = new FileReader();
@@ -501,6 +536,9 @@
       };
       reader.readAsDataURL(file);
     });
+    
+    // Reset auth after upload
+    isAdminMode = false;
   }
 
   function renderGallery() {
@@ -532,12 +570,12 @@
       thumbsEl.appendChild(div);
     });
 
-    // Add more button
+    // Add more button (admin only)
     const addBtn = document.createElement('div');
     addBtn.className = 'thumb-add';
-    addBtn.title = 'Add more images';
+    addBtn.title = 'Add more images (Admin only)';
     addBtn.innerHTML = '+';
-    addBtn.onclick = () => document.getElementById('imgInput').click();
+    addBtn.onclick = () => openAdminModal();
     thumbsEl.appendChild(addBtn);
   }
 
@@ -548,6 +586,26 @@
       renderGallery();
     }
   });
+
+  // Scroll animations
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (!e.isIntersecting) return;
+      e.target.classList.add('visible');
+      e.target.querySelectorAll('[data-target]').forEach(el => {
+        const t = +el.dataset.target; let c = 0;
+        const iv = setInterval(() => {
+          c = Math.min(c + t/50, t);
+          el.textContent = Math.floor(c);
+          if (c >= t) { el.textContent = t; clearInterval(iv); }
+        }, 30);
+      });
+    });
+  }, { threshold: 0.12 });
+  document.querySelectorAll('.fade-in').forEach(el => obs.observe(el));
+
+  const st = document.getElementById('scrollTop');
+  window.addEventListener('scroll', () => st.classList.toggle('show', scrollY > 400));
 </script>
 </body>
 </html>
